@@ -1,0 +1,7 @@
+name: Team C
+previously:
+- Team X
+description: Team C description
+members:
+- team-c-member-1@seek.com.au
+- team-c-member-2@seek.com.au

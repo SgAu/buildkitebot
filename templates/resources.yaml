@@ -1,0 +1,162 @@
+kind: cloudFormationStack
+schemaVersion: v0.0
+stackName: '{{.Values.service}}-resources'
+retainOnDelete: true
+region: '{{.Values.region}}'
+definition:
+  Resources:
+    ###
+    ### SecretsManager Resources
+    ###
+
+    ConfigSecret:
+      Type: AWS::SecretsManager::Secret
+      Properties:
+        Name: '{{.Values.configSecretID}}'
+        Description: 'Config for {{.Values.service}}'
+        KmsKeyId:
+          Fn::GetAtt: [EncryptionKey, Arn]
+        SecretString: replace-me
+
+    EncryptionKey:
+      Type: AWS::KMS::Key
+      Properties:
+        Description: Encryption key for orgbot
+        KeyPolicy:
+          Version: 2012-10-17
+          Statement:
+          - Sid: RootAccountAdmin
+            Effect: Allow
+            Action: 'kms:*'
+            Resource: '*'
+            Principal:
+              AWS: 'arn:aws:iam::{{.AWSAccountID}}:root'
+
+    ###
+    ### SQS Resources
+    ###
+
+    EventQueue:
+      Type: AWS::SQS::Queue
+      Properties: 
+        FifoQueue: true
+        QueueName: '{{.Values.service}}.fifo'
+        RedrivePolicy:
+          deadLetterTargetArn:
+            Fn::GetAtt: [DeadLetterQueue, Arn]
+          maxReceiveCount: 5
+
+    DeadLetterQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        FifoQueue: true
+        QueueName: '{{.Values.service}}-dead-letter.fifo'
+
+    DeadLetterAlarm:	
+      Type: AWS::CloudWatch::Alarm	
+      Properties:	
+        AlarmName: OrgbotDeadLetter
+        AlarmDescription: 'Alerts when an event cannot be processed for the Github org'	
+        Namespace: AWS/SQS	
+        Threshold: 0
+        EvaluationPeriods: 1	
+        Statistic: Sum	
+        Period: 60	
+        AlarmActions:	
+        - {{ .Values.alarmSnsTopicArn }}	
+        Dimensions:	
+        - Name: QueueName	
+          Value: 	
+            Fn::GetAtt: [DeadLetterQueue, QueueName]	
+        ComparisonOperator: GreaterThanThreshold	
+        MetricName: Errors
+
+    UnprocessedEventsAlarm:	
+      Type: AWS::CloudWatch::Alarm	
+      Properties:	
+        AlarmName: OrgbotEvents
+        AlarmDescription: 'Alerts when there are too many unprocessed events for the Github org'	
+        Namespace: AWS/SQS	
+        Threshold: 3600
+        MetricName: ApproximateAgeOfOldestMessage
+        EvaluationPeriods: 1
+        Period: 3600	
+        Statistic: Maximum
+        AlarmActions:	
+        - {{ .Values.alarmSnsTopicArn }}	
+        Dimensions:	
+        - Name: QueueName	
+          Value: 	
+            Fn::GetAtt: [EventQueue, QueueName]	
+        ComparisonOperator: GreaterThanThreshold
+
+    ###
+    ### S3 Resources
+    ###
+
+    OrgBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: '{{.Values.orgBucket}}'
+        VersioningConfiguration:
+          Status: Enabled
+
+    OrgBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket:
+          Ref: OrgBucket
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Principal:
+              AWS: '*'
+            Condition:
+              StringEquals:
+                # Allow all accounts within SEEK ANZ to read
+                aws:PrincipalOrgID: o-zfzjsnz1xo
+            Action:
+            - s3:GetObject
+            Resource:
+              Fn::Sub: '${OrgBucket.Arn}/*'
+---
+kind: service
+schemaVersion: v0.0
+name: '{{.Values.service}}'
+image: '{{.Values.image}}'
+region: '{{.Values.region}}'
+sslEnabled: false
+env:
+  SERVICE: '{{.Values.service}}'
+  VERSION: '{{.BuildID}}'
+  REGION: '{{.Values.region}}'
+  CONFIG_SECRET_ID: '{{.Values.configSecretID}}'
+  GITHUB_AUDIT_BUCKET: '{{.Values.gitHubAuditBucket}}'
+  QUEUE_URL: 'https://sqs.{{.Values.region}}.amazonaws.com/{{.AWSAccountID}}/{{.Values.service}}.fifo'
+iamRoleStatements:
+- Effect: Allow
+  Action:
+  - kms:Decrypt
+  Resource: '*'
+- Effect: Allow
+  Action: secretsmanager:GetSecretValue
+  Resource: 'arn:aws:secretsmanager:ap-southeast-2:{{.AWSAccountID}}:secret:{{.Values.configSecretID}}-??????'
+- Effect: Allow
+  Action: s3:GetObject
+  Resource: 'arn:aws:s3:::{{.Values.gitHubAuditBucket}}/*'
+- Effect: Allow
+  Action: 
+  - sqs:ReceiveMessage
+  - sqs:SendMessage
+  - sqs:DeleteMessage
+  - sqs:GetQueueAttributes
+  - sqs:ChangeMessageVisibility
+  Resource: 'arn:aws:sqs:{{.Values.region}}:{{.AWSAccountID}}:{{.Values.service}}.fifo'
+authentication:
+  ignoreRoutes:
+    - '/hook'
+---
+kind: containerImage
+image: '{{.Values.image}}'
+schemaVersion: v0.0

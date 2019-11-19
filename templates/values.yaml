@@ -1,0 +1,8 @@
+service: orgbot
+region: ap-southeast-2
+image: '{{.AWSAccountID}}.dkr.ecr.{{.Values.region}}.amazonaws.com/{{.Values.service}}:{{.BuildID}}'
+buildBucket: seek-paved-road-artefacts
+orgBucket: seek-org
+alarmSnsTopicArn: arn:aws:sns:ap-southeast-2:325678176096:eng-alerts-slackbot
+gitHubAuditBucket: sec-github-audit
+configSecretID: '{{.Values.service}}/config'

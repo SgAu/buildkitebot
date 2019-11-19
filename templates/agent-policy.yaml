@@ -1,0 +1,44 @@
+#
+# This stack provisions the managed IAM policy for the Buildkite agent cluster
+# named 'org' that is responsible for pushing out team changes via the org-deploy
+# pipeline.
+#
+# This stack should be provisioned in the PavedRoad-Prod account (849781104100) via:
+#
+# gantry apply -f templates/agent-policy.yaml -v templates/values.yaml -e production
+#
+kind: cloudFormationStack
+schemaVersion: v0.0
+stackName: org-agent-policy
+retainOnDelete: true
+region: '{{.Values.region}}'
+definition:
+  Resources:
+    OrgAgentPolicy:
+      Type: AWS::IAM::ManagedPolicy
+      Properties:
+        Description: Buildkite agent permissions for running orgctl
+        ManagedPolicyName: org-agent-policy
+        Path: '/'
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - kms:Decrypt
+            Resource: '*'
+          - Effect: Allow
+            Action: secretsmanager:GetSecretValue
+            Resource: 'arn:aws:secretsmanager:{{.Values.region}}:{{.AWSAccountID}}:secret:{{.Values.configSecretID}}-??????'
+          - Effect: Allow
+            Action: s3:GetObject
+            Resource: 'arn:aws:s3:::{{.Values.gitHubAuditBucket}}/*'
+          - Effect: Allow
+            Action: ecr:GetAuthorizationToken
+            Resource: '*'
+          - Effect: Allow
+            Action:
+            - ecr:BatchCheckLayerAvailability
+            - ecr:GetDownloadUrlForLayer
+            - ecr:BatchGetImage
+            Resource: 'arn:aws:ecr:{{.Values.region}}:account:{{.AWSAccountID}}:repository/{{.Values.service}}'

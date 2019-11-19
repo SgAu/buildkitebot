@@ -1,0 +1,18 @@
+name: SEEK-Jobs
+teams:
+- name: Team A
+  description: Parent of all teams
+  members:
+  - alice@seek.com.au
+  - bob@seek.com.au
+  teams:
+  - name: Team B
+    description: Child of Team A
+    members:
+    - jane@seek.com.au
+    - lester@seek.com.au
+  - name: Team C
+    description: Child of Team A
+    members:
+    - david@seek.com.au
+    - sarah@seek.com.au

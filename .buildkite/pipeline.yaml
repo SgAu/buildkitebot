@@ -1,0 +1,3 @@
+steps:
+- label: ":buildkite: Create pipeline"
+  command: ".buildkite/${BUILDKITE_PIPELINE_SLUG:-}.sh | buildkite-agent pipeline upload"

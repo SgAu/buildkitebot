@@ -1,0 +1,16 @@
+version: '3.4'
+services:
+  base:
+    build:
+      context: .
+      target: base
+  code-quality:
+    build:
+      context: .
+      target: code-quality
+  snyk:
+    build:
+      context: .
+      target: snyk
+    environment:
+      - SNYK_TOKEN

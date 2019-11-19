@@ -1,0 +1,24 @@
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened]
+
+jobs:
+  organise_issues:
+    runs-on: ubuntu-latest
+    name: Organise issues and pulls
+    steps:
+      - name: Assign to project
+        id: organise
+        uses: seek-oss/action-project-manager@master
+        with:
+          issueColumnId: '4154706' # Backlog column of paved road project
+          pullRequestColumnId: '6151261' # To review column of paved road project
+          token: '${{ secrets.PROJECT_MANAGER_ACTION_TOKEN }}' # Custom access token stored in this repos secrets. See settings>secrets. Because the project we are adding cards to is an org level project the default secret for this action does not have sufficient scope
+      - name: Apply repo label
+        uses: actions/github@v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # The default token is sufficient for adding labels
+        with:
+          args: label orgbot

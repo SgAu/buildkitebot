@@ -1,0 +1,2 @@
+# Publish Orgbot image as latest for CLI usage
+image: '{{.AWSAccountID}}.dkr.ecr.{{.Values.region}}.amazonaws.com/{{.Values.service}}:latest'
